@@ -10,6 +10,46 @@ export function useItems(family, user) {
   useEffect(() => {
     if (!family) { setItems([]); setLoading(false); return }
     fetchItems()
+
+    const channel = supabase
+      .channel(`items:${family.id}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'items',
+        filter: `family_id=eq.${family.id}`
+      }, async (payload) => {
+        const { data } = await supabase
+          .from('items')
+          .select('id, name, bought, created_at, profiles!added_by(full_name)')
+          .eq('id', payload.new.id)
+          .single()
+        if (data) setItems(prev => {
+          if (prev.find(i => i.id === data.id)) return prev
+          return [...prev, normalize(data)]
+        })
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'items',
+        filter: `family_id=eq.${family.id}`
+      }, (payload) => {
+        setItems(prev => prev.map(i =>
+          i.id === payload.new.id ? { ...i, bought: payload.new.bought } : i
+        ))
+      })
+      .on('postgres_changes', {
+        event: 'DELETE',
+        schema: 'public',
+        table: 'items',
+        filter: `family_id=eq.${family.id}`
+      }, (payload) => {
+        setItems(prev => prev.filter(i => i.id !== payload.old.id))
+      })
+      .subscribe()
+
+    return () => supabase.removeChannel(channel)
   }, [family])
 
   const fetchItems = async () => {
