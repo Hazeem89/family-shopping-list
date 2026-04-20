@@ -11,14 +11,19 @@ A real-time collaborative shopping list app for families. Multiple family member
 | Backend | Supabase (Auth, Database, Realtime) |
 | Deployment | Vercel |
 
+## Live Demo
+
+https://family-shopping-list-three.vercel.app/
+
 ## Features
 
 - Sign up / sign in with email and password
 - Create a family or join one with an invite code
 - Add, check off, and delete shopping items
 - Real-time sync — changes appear instantly for all family members
+- Live online presence — see how many family members are currently active
 - Activity feed showing recent actions (added, checked, removed)
-- Invite code displayed in the header for easy sharing
+- Invite code displayed in the header for easy sharing (admin only)
 
 ## Project Structure
 
