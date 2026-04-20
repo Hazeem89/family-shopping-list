@@ -12,26 +12,22 @@ export function useFamily(user) {
   }, [user])
 
   useEffect(() => {
-    if (!family?.id) return
+    if (!family?.id || !user) return
 
     const channel = supabase
-      .channel(`family_members:${family.id}`)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'family_members',
-        filter: `family_id=eq.${family.id}`
-      }, async () => {
-        const { count } = await supabase
-          .from('family_members')
-          .select('*', { count: 'exact', head: true })
-          .eq('family_id', family.id)
-        setMemberCount(count ?? 0)
+      .channel(`presence:${family.id}`, { config: { presence: { key: user.id } } })
+      .on('presence', { event: 'sync' }, () => {
+        const state = channel.presenceState()
+        setMemberCount(Object.keys(state).length)
       })
-      .subscribe()
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await channel.track({ user_id: user.id })
+        }
+      })
 
     return () => supabase.removeChannel(channel)
-  }, [family?.id])
+  }, [family?.id, user?.id])
 
   const fetchFamily = async () => {
     setLoading(true)
@@ -43,15 +39,6 @@ export function useFamily(user) {
 
     const familyData = data ? { ...data.families, role: data.role } : null
     setFamily(familyData)
-
-    if (familyData) {
-      const { count } = await supabase
-        .from('family_members')
-        .select('*', { count: 'exact', head: true })
-        .eq('family_id', familyData.id)
-      setMemberCount(count ?? 0)
-    }
-
     setLoading(false)
   }
 
