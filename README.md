@@ -1,4 +1,4 @@
-# Family Shopping List
+# Real-Time Family Shopping List
 
 A real-time collaborative shopping list app for families. Multiple family members can add, check off, and delete items — changes sync instantly across all connected devices.
 
@@ -25,6 +25,15 @@ https://family-shopping-list-three.vercel.app/
 - Activity feed showing recent actions (added, checked, removed)
 - Invite code displayed in the header for easy sharing (admin only)
 
+## Screenshots
+
+| Screen | Preview |
+|---|---|
+| Sign In / Sign Up | ![Auth page](screenshots/auth.png) |
+| Create or Join Family | ![Family setup](screenshots/family-setup.png) |
+| Shopping List | ![Shopping list](screenshots/shopping-list.png) |
+| Activity Feed & Online Presence | ![Activity feed](screenshots/activity-feed.png) |
+
 ## Project Structure
 
 ```
@@ -49,6 +58,7 @@ client/
     │   ├── AddItemForm.jsx
     │   ├── ItemList.jsx
     │   ├── ItemRow.jsx
+    │   ├── JoinScreen.jsx
     │   └── ActivityFeed.jsx
     ├── App.jsx
     ├── main.jsx
@@ -60,7 +70,7 @@ client/
 ### Prerequisites
 
 - Node.js 18+
-- A [Supabase](https://supabase.com) project with the schema from `.ai/schema.sql`
+- A [Supabase](https://supabase.com) project
 
 ### Installation
 
