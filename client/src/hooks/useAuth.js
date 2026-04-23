@@ -1,9 +1,13 @@
 import { useState, useEffect } from 'react'
 import supabase from '../lib/supabase'
 
+const PROFILE_CACHE_KEY = 'fsl_profile'
+
 export function useAuth() {
   const [user, setUser] = useState(null)
-  const [profile, setProfile] = useState(null)
+  const [profile, setProfile] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(PROFILE_CACHE_KEY)) } catch { return null }
+  })
   const [loading, setLoading] = useState(true)
 
   const fetchProfile = async (userId) => {
@@ -12,20 +16,26 @@ export function useAuth() {
       .select('full_name')
       .eq('id', userId)
       .single()
-    setProfile(data)
+    if (data) {
+      localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(data))
+      setProfile(data)
+    }
   }
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      const currentUser = session?.user ?? null
-      setUser(currentUser)
-      if (currentUser) await fetchProfile(currentUser.id)
-      setLoading(false)
-    })
+    let released = false
+    const release = () => { if (!released) { released = true; setLoading(false) } }
+    const fallback = setTimeout(release, 5000)
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       const currentUser = session?.user ?? null
       setUser(currentUser)
+
+      if (event === 'INITIAL_SESSION') {
+        if (currentUser) await fetchProfile(currentUser.id)
+        release()
+        clearTimeout(fallback)
+      }
 
       if (event === 'SIGNED_IN' && window.location.hash.includes('access_token')) {
         window.history.replaceState(null, '', window.location.pathname)
@@ -48,10 +58,16 @@ export function useAuth() {
         await fetchProfile(currentUser.id)
       }
 
-      if (event === 'SIGNED_OUT') setProfile(null)
+      if (event === 'SIGNED_OUT') {
+        localStorage.removeItem(PROFILE_CACHE_KEY)
+        setProfile(null)
+      }
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      clearTimeout(fallback)
+      subscription.unsubscribe()
+    }
   }, [])
 
   const signUp = async (email, password, fullName) => {

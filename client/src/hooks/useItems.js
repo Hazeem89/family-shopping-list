@@ -1,11 +1,19 @@
 import { useState, useEffect, useRef } from 'react'
 import supabase from '../lib/supabase'
 
+const itemsCacheKey = (familyId) => `fsl_items_${familyId}`
+
 export function useItems(family, user) {
-  const [items, setItems] = useState([])
+  const [items, setItems] = useState(() => {
+    if (!family?.id) return []
+    try { return JSON.parse(localStorage.getItem(itemsCacheKey(family.id))) ?? [] } catch { return [] }
+  })
   const [activity, setActivity] = useState([])
   const [newItemId, setNewItemId] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(() => {
+    if (!family?.id) return true
+    try { return !localStorage.getItem(itemsCacheKey(family.id)) } catch { return true }
+  })
   const [error, setError] = useState(null)
   const profileCache = useRef({})
 
@@ -68,7 +76,7 @@ export function useItems(family, user) {
       .subscribe()
 
     return () => supabase.removeChannel(channel)
-  }, [family])
+  }, [family?.id])
 
   const resolveProfile = async (userId) => {
     if (profileCache.current[userId]) return profileCache.current[userId]
@@ -83,16 +91,31 @@ export function useItems(family, user) {
   }
 
   const fetchItems = async () => {
-    setLoading(true)
-    const { data, error } = await supabase
-      .from('items')
-      .select('id, name, bought, created_at, profiles!added_by(full_name)')
-      .order('created_at', { ascending: true })
+    const cacheKey = itemsCacheKey(family.id)
+    const hasCached = !!localStorage.getItem(cacheKey)
+    if (!hasCached) setLoading(true)
 
-    if (error) { setError(error.message); setLoading(false); return }
+    const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 10000))
+    try {
+      const { data, error } = await Promise.race([
+        supabase
+          .from('items')
+          .select('id, name, bought, created_at, profiles!added_by(full_name)')
+          .eq('family_id', family.id)
+          .order('created_at', { ascending: true }),
+        timeout
+      ])
 
-    setItems(data.map(normalize))
-    setLoading(false)
+      if (error) { setError(error.message); return }
+
+      const normalized = data.map(normalize)
+      localStorage.setItem(cacheKey, JSON.stringify(normalized))
+      setItems(normalized)
+    } catch {
+      // timeout — keep cached data
+    } finally {
+      setLoading(false)
+    }
   }
 
   const normalize = (item) => ({

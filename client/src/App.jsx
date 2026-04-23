@@ -10,7 +10,7 @@ import ActivityFeed from './components/ActivityFeed'
 
 export default function App() {
   const { user, profile, loading: authLoading, signIn, signUp, signOut } = useAuth()
-  const { family, memberCount, loading: familyLoading, createFamily, joinFamily } = useFamily(user)
+  const { family, memberCount, loading: familyLoading, createFamily, joinFamily } = useFamily(user, authLoading)
   const { items, activity, newItemId, loading: itemsLoading, error, setError, addItem, toggleItem, deleteItem } = useItems(family, user)
 
   if (authLoading || familyLoading) {

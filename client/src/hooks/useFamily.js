@@ -1,15 +1,35 @@
 import { useState, useEffect } from 'react'
 import supabase from '../lib/supabase'
 
-export function useFamily(user) {
-  const [family, setFamily] = useState(null)
+const FAMILY_CACHE_KEY = 'fsl_family'
+
+function loadFamilyCache() {
+  try { return JSON.parse(localStorage.getItem(FAMILY_CACHE_KEY)) } catch { return null }
+}
+
+export function useFamily(user, authLoading) {
+  const [family, setFamily] = useState(loadFamilyCache)
   const [memberCount, setMemberCount] = useState(0)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(() => !loadFamilyCache())
 
   useEffect(() => {
-    if (!user) { setFamily(null); setLoading(false); return }
+    if (authLoading) return
+    if (!user) {
+      localStorage.removeItem(FAMILY_CACHE_KEY)
+      setFamily(null)
+      setLoading(false)
+      return
+    }
     fetchFamily()
-  }, [user])
+  }, [user?.id, authLoading])
+
+  useEffect(() => {
+    if (!user?.id) return
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'TOKEN_REFRESHED') fetchFamily()
+    })
+    return () => subscription.unsubscribe()
+  }, [user?.id])
 
   useEffect(() => {
     if (!family?.id || !user) return
@@ -30,16 +50,26 @@ export function useFamily(user) {
   }, [family?.id, user?.id])
 
   const fetchFamily = async () => {
-    setLoading(true)
-    const { data } = await supabase
-      .from('family_members')
-      .select('role, families(id, name, invite_code)')
-      .eq('user_id', user.id)
-      .single()
-
-    const familyData = data ? { ...data.families, role: data.role } : null
-    setFamily(familyData)
-    setLoading(false)
+    if (!family) setLoading(true)
+    const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 10000))
+    try {
+      const { data } = await Promise.race([
+        supabase
+          .from('family_members')
+          .select('role, families(id, name, invite_code)')
+          .eq('user_id', user.id)
+          .single(),
+        timeout
+      ])
+      const familyData = data ? { ...data.families, role: data.role } : null
+      if (familyData) localStorage.setItem(FAMILY_CACHE_KEY, JSON.stringify(familyData))
+      else localStorage.removeItem(FAMILY_CACHE_KEY)
+      setFamily(familyData)
+    } catch {
+      // timeout — leave cached data in place
+    } finally {
+      setLoading(false)
+    }
   }
 
   const createFamily = async (name) => {
